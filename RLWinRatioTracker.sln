@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34408.163
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RLWinRatioTracker", "RLWinRatioTracker.vcxproj", "{AD556360-8E63-4BA7-A78B-0F630E264E9D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AD556360-8E63-4BA7-A78B-0F630E264E9D}.Release|x64.ActiveCfg = Release|x64
+		{AD556360-8E63-4BA7-A78B-0F630E264E9D}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B36B288B-6176-4DAC-9CF3-1A5F0BE987B8}
+	EndGlobalSection
+EndGlobal
