@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fstream>
+
 #include "GuiBase.h"
 #include "bakkesmod/plugin/bakkesmodplugin.h"
 #include "bakkesmod/plugin/pluginwindow.h"
@@ -15,15 +17,19 @@ class RLWinRatioTracker: public BakkesMod::Plugin::BakkesModPlugin
 {
 
 	//std::shared_ptr<bool> enabled;
-
-	//Boilerplate
 private:
-	void Log(std::string message);
+	int games = 0;
+	int wins = 0;
 
+	std::unordered_map<std::string, int> conditionalGames = { {"Goals", 0}, {"Assists", 0}, {"Saves", 0}, {"Shots", 0} };
+	
+	void Save(std::string gameMode, int goals, int assists, int saves, int shots);
+	void Load();
+	
 public:
 	void onLoad() override;
-	void onUnload() override;
 
+	void RegisterCvars();
 	void LoadHooks();
 	void OnMatchEnd(std::string name);
 	//void RenderSettings() override; // Uncomment if you wanna render your own tab in the settings menu
