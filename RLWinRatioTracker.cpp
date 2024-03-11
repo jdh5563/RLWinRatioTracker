@@ -25,6 +25,9 @@ void RLWinRatioTracker::LoadHooks()
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnMatchEnded", std::bind(&RLWinRatioTracker::OnMatchEnd, this, std::placeholders::_1));
 }
 
+/// <summary>
+/// Get player stats after a match ends and save them to disk
+/// </summary>
 void RLWinRatioTracker::OnMatchEnd(std::string name)
 {
 	ServerWrapper server = gameWrapper->GetCurrentGameState();
@@ -35,11 +38,29 @@ void RLWinRatioTracker::OnMatchEnd(std::string name)
 	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots());
 }
 
+/// <summary>
+/// Save player data to disk
+/// </summary>
+/// <param name="gameMode">The playlist</param>
+/// <param name="goals">Number of goals scored</param>
+/// <param name="assists">Number of assists</param>
+/// <param name="saves">Number of saves</param>
+/// <param name="shots">Number of shot attempts</param>
 void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots)
 {
+	// Handling if the player was in a private match
 	if (gameMode == "") gameMode = "private_match";
 
-	//std::string filePath = gameWrapper->GetDataFolder().string() + "\\RLWinRatioTracker\\" + gameMode + "\\data.txt";
+	// Create directories if they don't yet exist
+	if (!std::filesystem::exists(gameWrapper->GetDataFolder() / "RLWinRatioTracker")) {
+		std::filesystem::create_directory(gameWrapper->GetDataFolder() / "RLWinRatioTracker");
+	}
+
+	if (!std::filesystem::exists(gameWrapper->GetDataFolder() / "RLWinRatioTracker" / gameMode)) {
+		std::filesystem::create_directory(gameWrapper->GetDataFolder() / "RLWinRatioTracker" / gameMode);
+	}
+
+	// Save the data
 	std::ofstream stream(gameWrapper->GetDataFolder() / "RLWinRatioTracker" / gameMode / "data.txt", std::ios_base::app);
 
 	stream << goals << "," << assists << "," << saves << "," << shots << std::endl;
