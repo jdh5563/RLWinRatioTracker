@@ -18,7 +18,13 @@ class RLWinRatioTracker: public BakkesMod::Plugin::BakkesModPlugin
 
 	//std::shared_ptr<bool> enabled;
 private:
-	std::unordered_map<std::string, std::tuple<int, int, int>> gameStats = { {"Overall", {0, 0, 0}}, {"Goals", {0, 0, 0}}, {"Assists", {0, 0, 0}}, {"Saves", {0, 0, 0}}, {"Shots", {0, 0, 0}} };
+	// Maps game modes to a nested map containing statistics related to that mode
+	std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<int, int>>> gameStats =
+	{ 
+		{ "Duel", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
+		{ "Doubles", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
+		{ "Standard", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } }
+	};
 	std::vector<CVarWrapper> displayToggles;
 	std::vector<CVarWrapper> statMinimums;
 
@@ -46,6 +52,16 @@ private:
 	/// <returns>A vector containing the split string</returns>
 	std::vector<std::string> SplitString(std::string stringToSplit, char delimeter);
 
+	template<typename TKey, typename TVal>
+	std::vector<TKey> GetMapKeys(std::unordered_map<TKey, TVal> map) {
+		std::vector<TKey> keys;
+
+		for (auto element : map) {
+			keys.push_back(element.first);
+		}
+
+		return keys;
+	}
 
 	void DisplayWinRatios();
 	
