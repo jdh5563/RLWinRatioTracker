@@ -14,10 +14,35 @@ void RLWinRatioTracker::onLoad()
 	this->RegisterCvars();
 }
 
+void RLWinRatioTracker::RenderSettings()
+{
+	ImGui::TextUnformatted("Rocket League Win Ratio Tracker");
+
+	for (int i = 0; i < displayToggles.size(); i++) {
+		// The commented code is what will be used if storing a cvar and accessing it directly doesn't work
+		// If changing back to this way, displayToggles vector should store strings instead of cvars
+		//CVarWrapper toggle = cvarManager->getCvar(displayToggles[i].getCVarName());
+
+		bool enabled = displayToggles[i].getBoolValue();
+		std::string checkboxText = "Track " + displayToggles[i].getCVarName().substr(21);
+
+		if (ImGui::Checkbox(checkboxText.c_str(), &enabled));
+	}
+}
+
 void RLWinRatioTracker::RegisterCvars()
 {
-	cvarManager->registerCvar("winRatioTracker_trackGoals", "1", "Track win ratio based on games where you score a certain number of goals", true, true, 0, true, 1);
-	cvarManager->registerCvar("winRatioTracker_minGoalsScored", "1", "The minimum number of goals scored in a match to count towards the tracker", true, true, 1);
+	displayToggles.push_back(cvarManager->registerCvar("winRatioTracker_trackGoals", "1", "Track win ratio based on games where you score a certain number of goals", true, true, 0, true, 1));
+	statMinimums.push_back(cvarManager->registerCvar("winRatioTracker_minGoalsScored", "1", "The minimum number of goals scored in a match to count towards the tracker", true, true, 1));
+
+	displayToggles.push_back(cvarManager->registerCvar("winRatioTracker_trackAssists", "1", "Track win ratio based on games where you make a certain number of assists", true, true, 0, true, 1));
+	statMinimums.push_back(cvarManager->registerCvar("winRatioTracker_minAssistsMade", "1", "The minimum number of assists made in a match to count towards the tracker", true, true, 1));
+
+	displayToggles.push_back(cvarManager->registerCvar("winRatioTracker_trackSaves", "1", "Track win ratio based on games where you make a certain number of saves", true, true, 0, true, 1));
+	statMinimums.push_back(cvarManager->registerCvar("winRatioTracker_minSavesMade", "1", "The minimum number of saves made in a match to count towards the tracker", true, true, 1));
+
+	displayToggles.push_back(cvarManager->registerCvar("winRatioTracker_trackShots", "1", "Track win ratio based on games where you take a certain number of shots", true, true, 0, true, 1));
+	statMinimums.push_back(cvarManager->registerCvar("winRatioTracker_minShotsTaken", "1", "The minimum number of shots taken in a match to count towards the tracker", true, true, 1));
 }
 
 void RLWinRatioTracker::LoadHooks()
@@ -35,18 +60,10 @@ void RLWinRatioTracker::OnMatchEnd(std::string name)
 
 	PriWrapper player = gameWrapper->GetPlayerController().GetPRI();
 
-	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots());
+	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
 }
 
-/// <summary>
-/// Save player data to disk
-/// </summary>
-/// <param name="gameMode">The playlist</param>
-/// <param name="goals">Number of goals scored</param>
-/// <param name="assists">Number of assists</param>
-/// <param name="saves">Number of saves</param>
-/// <param name="shots">Number of shot attempts</param>
-void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots)
+void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots, int won)
 {
 	// Handling if the player was in a private match
 	if (gameMode == "") gameMode = "private_match";
@@ -63,11 +80,48 @@ void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int s
 	// Save the data
 	std::ofstream stream(gameWrapper->GetDataFolder() / "RLWinRatioTracker" / gameMode / "data.txt", std::ios_base::app);
 
-	stream << goals << "," << assists << "," << saves << "," << shots << std::endl;
+	stream << "Goals," << goals << ",Assists," << assists << ",Saves," << saves << ",Shots," << shots << ",Won," << won << std::endl;
 
 	stream.close();
 }
 
 void RLWinRatioTracker::Load()
 {
+	std::ifstream stream("C:/Users/heide/Desktop/test.txt"); // <- Replace this with the correct general path from Save()
+	std::string line;
+
+	// Iterate through each match in the file
+	while (std::getline(stream, line)) {
+		std::vector<std::string> splitLine = SplitString(line, ',');
+		int won = std::stoi(splitLine[9]);
+
+		std::get<0>(gameStats["Overall"]) += won;
+		std::get<1>(gameStats["Overall"])++;
+
+		for (int i = 0; i < splitLine.size() - 2; i += 2) {
+			if (std::stoi(splitLine[i + 1]) >= std::get<2>(gameStats[splitLine[i]])) {
+				std::get<0>(gameStats[splitLine[i]]) += won;
+				std::get<1>(gameStats[splitLine[i]])++;
+			}
+		}
+	}
+
+	stream.close();
+}
+
+std::vector<std::string> RLWinRatioTracker::SplitString(std::string stringToSplit, char delimeter)
+{
+	std::vector<std::string> splitString = std::vector<std::string>();
+	std::stringstream stringStream(stringToSplit);
+	std::string stringPart;
+	while (std::getline(stringStream, stringPart, delimeter)) {
+		splitString.push_back(stringPart);
+	}
+
+	return splitString;
+}
+
+void RLWinRatioTracker::DisplayWinRatios()
+{
+
 }
