@@ -19,15 +19,24 @@ void RLWinRatioTracker::RenderSettings()
 	ImGui::TextUnformatted("Rocket League Win Ratio Tracker");
 
 	for (int i = 0; i < displayToggles.size(); i++) {
-		// The commented code is what will be used if storing a cvar and accessing it directly doesn't work
-		// If changing back to this way, displayToggles vector should store strings instead of cvars
-		//CVarWrapper toggle = cvarManager->getCvar(displayToggles[i].getCVarName());
-
 		bool enabled = displayToggles[i].getBoolValue();
 		std::string checkboxText = "Track " + displayToggles[i].getCVarName().substr(21);
 
-		if (ImGui::Checkbox(checkboxText.c_str(), &enabled));
+		if (ImGui::Checkbox(checkboxText.c_str(), &enabled)) {
+			displayToggles[i].setValue(enabled);
+		}
 	}
+
+	for (int i = 0; i < statMinimums.size(); i++) {
+		int min = statMinimums[i].getIntValue();
+		std::string sliderText = "Minimum " + displayToggles[i].getCVarName().substr(21);
+
+		if (ImGui::SliderInt(sliderText.c_str(), &min, 1, 10)) {
+			statMinimums[i].setValue(min);
+		}
+	}
+
+	DisplayWinRatios();
 }
 
 void RLWinRatioTracker::RegisterCvars()
