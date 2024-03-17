@@ -18,7 +18,8 @@ void RLWinRatioTracker::onLoad()
 
 void RLWinRatioTracker::RenderSettings()
 {
-	ImGui::TextUnformatted("Rocket League Win Ratio Tracker");
+	ImGui::TextUnformatted("WARNING: If you abandon a match or leave before the podium appears, your data may not be saved!");
+	ImGui::TextUnformatted("");
 
 	// Check which stats should be displayed
 	for (int i = 0; i < displayToggles.size(); i++) {
@@ -73,10 +74,9 @@ void RLWinRatioTracker::OnMatchEnd(std::string name)
 
 	PriWrapper player = gameWrapper->GetPlayerController().GetPRI();
 
-	// After each game, save match to disk, update variables, then display updated results
+	// After each game, save match to disk and update variables
 	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
 	UpdateGameStats(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
-	DisplayWinRatios();
 }
 
 void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots, int won)
@@ -140,6 +140,9 @@ void RLWinRatioTracker::UpdateGameStats(std::string gameMode, int goals, int ass
 {
 	// Currently we only care about core playlists
 	if (!(gameMode == "Duel" || gameMode == "Doubles" || gameMode == "Standard")) return;
+
+	std::get<0>(gameStats[gameMode]["Overall"]) += won;
+	std::get<1>(gameStats[gameMode]["Overall"])++;
 
 	for (CVarWrapper min : statMinimums) {
 		std::string statName = min.getCVarName().substr(19);

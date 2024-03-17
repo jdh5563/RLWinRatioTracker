@@ -64,7 +64,7 @@ private:
 	std::vector<std::string> SplitString(std::string stringToSplit, char delimeter);
 
 	/// <summary>
-	/// Displays all statistics in the Bakkesmod GUI
+	/// Displays all statistics in the Bakkesmod GUI (WARNING: This function only works if called from the RenderSettings function)
 	/// </summary>
 	void DisplayWinRatios();
 
