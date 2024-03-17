@@ -11,21 +11,22 @@
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
 
-class RLWinRatioTracker: public BakkesMod::Plugin::BakkesModPlugin
-	,public SettingsWindowBase
-	//,public PluginWindowBase // Uncomment if you want to render your own plugin window
+class RLWinRatioTracker: public BakkesMod::Plugin::BakkesModPlugin, public SettingsWindowBase
 {
-
-	//std::shared_ptr<bool> enabled;
 private:
-	// Maps game modes to a nested map containing statistics related to that mode
-	std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<int, int>>> gameStats =
-	{ 
+	const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<int, int>>> defaultStats = {
 		{ "Duel", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
 		{ "Doubles", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
 		{ "Standard", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } }
 	};
+
+	// Maps game modes to statistics related to that mode
+	std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<int, int>>> gameStats = defaultStats;
+
+	// Holds whether each statistic should be displayed
 	std::vector<CVarWrapper> displayToggles;
+
+	// Holds the minimum value a statistic must meet to be counted for tracking
 	std::vector<CVarWrapper> statMinimums;
 
 	/// <summary>
@@ -45,13 +46,34 @@ private:
 	void Load();
 
 	/// <summary>
+	/// Update internal values for statistics
+	/// </summary>
+	/// <param name="gameMode">The playlist associate with this match</param>
+	/// <param name="goals">The number of goals scored</param>
+	/// <param name="assists">The number of assists made</param>
+	/// <param name="saves">The number of saves made</param>
+	/// <param name="shots">The number of shots taken</param>
+	/// <param name="won">Whether the match was won</param>
+	void UpdateGameStats(std::string gameMode, int goals, int assists, int saves, int shots, int won);
+
+	/// <summary>
 	/// Returns a vector containing the given string split based on the given delimeter
 	/// </summary>
 	/// <param name="stringToSplit">The string to split</param>
 	/// <param name="delimeter">The delimeter to base the split on</param>
-	/// <returns>A vector containing the split string</returns>
 	std::vector<std::string> SplitString(std::string stringToSplit, char delimeter);
 
+	/// <summary>
+	/// Displays all statistics in the Bakkesmod GUI
+	/// </summary>
+	void DisplayWinRatios();
+
+	/// <summary>
+	/// Returns a vector containing all the keys in the given map
+	/// </summary>
+	/// <typeparam name="TKey">The type of the map's keys</typeparam>
+	/// <typeparam name="TVal">The type of the map's values</typeparam>
+	/// <param name="map">The map to parse</param>
 	template<typename TKey, typename TVal>
 	std::vector<TKey> GetMapKeys(std::unordered_map<TKey, TVal> map) {
 		std::vector<TKey> keys;
@@ -62,15 +84,11 @@ private:
 
 		return keys;
 	}
-
-	void DisplayWinRatios();
 	
 public:
 	void onLoad() override;
-
 	void RegisterCvars();
 	void LoadHooks();
 	void OnMatchEnd(std::string name);
 	void RenderSettings() override;
-	//void RenderWindow() override; // Uncomment if you want to render your own plugin window
 };

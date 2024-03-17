@@ -2,7 +2,7 @@
 #include "RLWinRatioTracker.h"
 
 
-BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", plugin_version, PLUGINTYPE_FREEPLAY)
+BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", "1.0.0", PLUGINTYPE_FREEPLAY)
 
 std::shared_ptr<CVarManagerWrapper> _globalCvarManager;
 
@@ -20,6 +20,7 @@ void RLWinRatioTracker::RenderSettings()
 {
 	ImGui::TextUnformatted("Rocket League Win Ratio Tracker");
 
+	// Check which stats should be displayed
 	for (int i = 0; i < displayToggles.size(); i++) {
 		bool enabled = displayToggles[i].getBoolValue();
 		std::string checkboxText = "Track " + displayToggles[i].getCVarName().substr(21);
@@ -29,12 +30,14 @@ void RLWinRatioTracker::RenderSettings()
 		}
 	}
 
+	// Update the minimum number of each stat is required for data tracking
 	for (int i = 0; i < statMinimums.size(); i++) {
 		int min = statMinimums[i].getIntValue();
 		std::string sliderText = "Minimum " + displayToggles[i].getCVarName().substr(21);
 
 		if (ImGui::SliderInt(sliderText.c_str(), &min, 1, 10)) {
 			statMinimums[i].setValue(min);
+			Load();
 		}
 	}
 
@@ -63,9 +66,6 @@ void RLWinRatioTracker::LoadHooks()
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnMatchEnded", std::bind(&RLWinRatioTracker::OnMatchEnd, this, std::placeholders::_1));
 }
 
-/// <summary>
-/// Get player stats after a match ends and save them to disk
-/// </summary>
 void RLWinRatioTracker::OnMatchEnd(std::string name)
 {
 	ServerWrapper server = gameWrapper->GetCurrentGameState();
@@ -73,7 +73,10 @@ void RLWinRatioTracker::OnMatchEnd(std::string name)
 
 	PriWrapper player = gameWrapper->GetPlayerController().GetPRI();
 
+	// After each game, save match to disk, update variables, then display updated results
 	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
+	UpdateGameStats(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
+	DisplayWinRatios();
 }
 
 void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots, int won)
@@ -100,6 +103,8 @@ void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int s
 
 void RLWinRatioTracker::Load()
 {
+	gameStats = defaultStats;
+
 	std::filesystem::directory_iterator baseDirectory(gameWrapper->GetDataFolder() / "RLWinRatioTracker");
 
 	// Iterate through each game mode in the data folder
@@ -115,11 +120,12 @@ void RLWinRatioTracker::Load()
 			std::vector<std::string> splitLine = SplitString(line, ',');
 			int won = std::stoi(splitLine[9]);
 
+			// Populate gameStats with data
 			std::get<0>(gameStats[directoryName]["Overall"]) += won;
 			std::get<1>(gameStats[directoryName]["Overall"])++;
 
 			for (int i = 0; i < splitLine.size() - 2; i += 2) {
-				if (std::stoi(splitLine[i + 1]) >= cvarManager->getCvar("winRatioTracker_min" + splitLine[i]).getIntValue()) {
+				if (std::stoi(splitLine[i + 1]) >= statMinimums[i / 2].getIntValue()) {
 					std::get<0>(gameStats[directoryName][splitLine[i]]) += won;
 					std::get<1>(gameStats[directoryName][splitLine[i]])++;
 				}
@@ -130,16 +136,43 @@ void RLWinRatioTracker::Load()
 	}
 }
 
+void RLWinRatioTracker::UpdateGameStats(std::string gameMode, int goals, int assists, int saves, int shots, int won)
+{
+	// Currently we only care about core playlists
+	if (!(gameMode == "Duel" || gameMode == "Doubles" || gameMode == "Standard")) return;
+
+	for (CVarWrapper min : statMinimums) {
+		std::string statName = min.getCVarName().substr(19);
+		std::get<1>(gameStats[gameMode][statName])++;
+
+		// Check each stat, incrementing if the threshold is met or exceeded
+		if (statName == "Goals") {
+			if (goals >= min.getIntValue()) std::get<0>(gameStats[gameMode][statName])++;
+		}
+		else if (statName == "Assists") {
+			if (assists >= min.getIntValue()) std::get<0>(gameStats[gameMode][statName])++;
+		}
+		else if (statName == "Saves") {
+			if (saves >= min.getIntValue()) std::get<0>(gameStats[gameMode][statName])++;
+		}
+		else if(statName == "Shots") {
+			if (shots >= min.getIntValue()) std::get<0>(gameStats[gameMode][statName])++;
+		}
+	}
+}
+
 void RLWinRatioTracker::DisplayWinRatios()
 {
 	std::vector<std::string> gameModes = GetMapKeys(gameStats);
 
+	// Display stats for each game mode
 	for (std::string gameMode : gameModes) {
 		float wins = std::get<0>(gameStats[gameMode]["Overall"]);
 		float games = std::get<1>(gameStats[gameMode]["Overall"]);
 
 		ImGui::TextUnformatted((gameMode + " Stats:").c_str());
 
+		// Handling division by 0
 		if (games == 0) {
 			ImGui::TextUnformatted("No games played!");
 			ImGui::TextUnformatted("");
@@ -150,23 +183,27 @@ void RLWinRatioTracker::DisplayWinRatios()
 
 		ImGui::TextUnformatted(ratio.c_str());
 
-		for (CVarWrapper displayToggle : displayToggles) {
-			if (displayToggle.getBoolValue()) {
-				wins = std::get<0>(gameStats[gameMode][displayToggle.getCVarName().substr(21)]);
-				games = std::get<1>(gameStats[gameMode][displayToggle.getCVarName().substr(21)]);
+		// Display each stat individually
+		for(int i = 0; i < displayToggles.size(); i++) {
+			if (displayToggles[i].getBoolValue()) {
+				std::string statName = displayToggles[i].getCVarName().substr(21);
+				wins = std::get<0>(gameStats[gameMode][statName]);
+				games = std::get<1>(gameStats[gameMode][statName]);
 
-				ratio = "Win ratio based on at least " + cvarManager->getCvar("winRatioTracker_min" + displayToggle.getCVarName().substr(21)).getStringValue() + " " + displayToggle.getCVarName().substr(21) + ": ";
+				ratio = "Win ratio based on at least " + statMinimums[i].getStringValue() + " " + statName + ": ";
 
 				if (games > 0) {
 					 ratio += std::format("{:.2f}", wins / games * 100.0) + "%";
 				}
 				else {
-					ratio += "No " + displayToggle.getCVarName().substr(21) + " made!";
+					ratio += "No " + statName + " made!";
 				}
 
 				ImGui::TextUnformatted(ratio.c_str());
 			}
 		}
+
+		ImGui::TextUnformatted("");
 	}
 }
 
