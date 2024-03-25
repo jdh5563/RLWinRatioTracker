@@ -2,7 +2,7 @@
 #include "RLWinRatioTracker.h"
 
 
-BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", "1.0.0", PLUGINTYPE_FREEPLAY)
+BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", "1.0.1", PLUGINTYPE_FREEPLAY)
 
 std::shared_ptr<CVarManagerWrapper> _globalCvarManager;
 
@@ -104,6 +104,9 @@ void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int s
 void RLWinRatioTracker::Load()
 {
 	gameStats = defaultStats;
+
+	// Ensure that the data folder actually exists
+	if (!std::filesystem::exists(gameWrapper->GetDataFolder() / "RLWinRatioTracker")) return;
 
 	std::filesystem::directory_iterator baseDirectory(gameWrapper->GetDataFolder() / "RLWinRatioTracker");
 
