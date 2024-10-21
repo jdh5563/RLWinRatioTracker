@@ -73,6 +73,7 @@ void RLWinRatioTracker::OnMatchEnd(std::string name)
 	if (!server) { return; }
 
 	PriWrapper player = gameWrapper->GetPlayerController().GetPRI();
+	if (player.IsSpectator()) { return; } // May need to handle if a match doesn't load properly too
 
 	// After each game, save match to disk and update variables
 	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
