@@ -2,7 +2,7 @@
 #include "RLWinRatioTracker.h"
 
 
-BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", "1.0.1", PLUGINTYPE_FREEPLAY)
+BAKKESMOD_PLUGIN(RLWinRatioTracker, "Win Ratio Tracker", "1.0.2", PLUGINTYPE_FREEPLAY)
 
 std::shared_ptr<CVarManagerWrapper> _globalCvarManager;
 
@@ -45,6 +45,10 @@ void RLWinRatioTracker::RenderSettings()
 	ImGui::TextUnformatted("");
 
 	DisplayWinRatios();
+
+	std::string crossbarText = "Total crossbars hit: " + crossbarTotal;
+	ImGui::TextUnformatted(crossbarText.c_str());
+	ImGui::TextUnformatted("");
 }
 
 void RLWinRatioTracker::RegisterCvars()
@@ -65,22 +69,50 @@ void RLWinRatioTracker::RegisterCvars()
 void RLWinRatioTracker::LoadHooks()
 {
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnMatchEnded", std::bind(&RLWinRatioTracker::OnMatchEnd, this, std::placeholders::_1));
+	gameWrapper->HookEvent("Function TAGame.GoalCrossbarVolumeManager_TA.TriggerHit", std::bind(&RLWinRatioTracker::OnCrossbarHit, this, std::placeholders::_1));
+
+	// Update who most recently touched the ball
+	gameWrapper->HookEventWithCaller<CarWrapper>(
+		"Function TAGame.Car_TA.OnHitBall",
+		[this](CarWrapper car, void* params, std::string name) { mostRecentTouchID = car.GetPRI().GetUniqueIdWrapper().GetIdString(); }
+	);
 }
 
 void RLWinRatioTracker::OnMatchEnd(std::string name)
 {
 	ServerWrapper server = gameWrapper->GetCurrentGameState();
-	if (!server) { return; }
+	if (!server || !server.HasWinner()) { return; }
 
 	PriWrapper player = gameWrapper->GetPlayerController().GetPRI();
 	if (player.IsSpectator()) { return; } // May need to handle if a match doesn't load properly too
 
 	// After each game, save match to disk and update variables
-	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
+	Save(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex(), crossbarByGame);
 	UpdateGameStats(server.GetPlaylist().GetTitle().ToString(), player.GetMatchGoals(), player.GetMatchAssists(), player.GetMatchSaves(), player.GetMatchShots(), server.GetMatchWinner().GetTeamIndex() == player.GetTeam().GetTeamIndex());
 }
 
-void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots, int won)
+void RLWinRatioTracker::OnCrossbarHit(std::string name)
+{
+	// Don't double count crossbar hits during a replay
+	if (gameWrapper->IsInReplay()) { return; }
+
+	ServerWrapper server = gameWrapper->GetCurrentGameState();
+	if (!server) { return; }
+
+	PriWrapper playerPRI = gameWrapper->GetPlayerController().GetPRI();
+	int teamNum = playerPRI.GetTeamNum();
+	Vector ballPos = server.GetBall().GetLocation();
+	bool isOpponentGoal = (ballPos.Y > 0 && teamNum == 0) || (ballPos.Y < 0 && teamNum == 1);
+
+	// Only count crossbar hits that this player hit on their opponents bar
+	if (isOpponentGoal && mostRecentTouchID == playerPRI.GetUniqueIdWrapper().GetIdString())
+	{
+		crossbarTotal++;
+		crossbarByGame++;
+	}
+}
+
+void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int saves, int shots, int won, int crossbars)
 {
 	// Currently we only care about core playlists
 	if (!(gameMode == "Duel" || gameMode == "Doubles" || gameMode == "Standard")) return;
@@ -97,7 +129,7 @@ void RLWinRatioTracker::Save(std::string gameMode, int goals, int assists, int s
 	// Save the data
 	std::ofstream stream(gameWrapper->GetDataFolder() / "RLWinRatioTracker" / gameMode / "data.txt", std::ios_base::app);
 
-	stream << "Goals," << goals << ",Assists," << assists << ",Saves," << saves << ",Shots," << shots << ",Won," << won << std::endl;
+	stream << "Goals," << goals << ",Assists," << assists << ",Saves," << saves << ",Shots," << shots << ",Won," << won << ",Crossbars," << crossbars << std::endl;
 
 	stream.close();
 }
@@ -134,6 +166,10 @@ void RLWinRatioTracker::Load()
 					std::get<1>(gameStats[directoryName][splitLine[i]])++;
 				}
 			}
+
+			// Populate the crossbar stat
+			// Need to check line size for compatibility with legacy stat tracking
+			if(splitLine.size() > 11) crossbarTotal += std::stoi(splitLine[11]);
 		}
 
 		stream.close();
@@ -166,6 +202,8 @@ void RLWinRatioTracker::UpdateGameStats(std::string gameMode, int goals, int ass
 			if (shots >= min.getIntValue()) std::get<0>(gameStats[gameMode][statName])++;
 		}
 	}
+
+	crossbarByGame = 0;
 }
 
 void RLWinRatioTracker::DisplayWinRatios()

@@ -14,6 +14,11 @@ constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_M
 class RLWinRatioTracker: public BakkesMod::Plugin::BakkesModPlugin, public SettingsWindowBase
 {
 private:
+	std::string mostRecentTouchID = "";
+
+	int crossbarTotal = 0;
+	int crossbarByGame = 0;
+
 	const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<int, int>>> defaultStats = {
 		{ "Duel", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
 		{ "Doubles", { {"Overall", {0, 0}}, {"Goals", {0, 0}}, {"Assists", {0, 0}}, {"Saves", {0, 0}}, {"Shots", {0, 0}} } },
@@ -38,7 +43,7 @@ private:
 	/// <param name="saves">The number of saves made</param>
 	/// <param name="shots">The number of shots taken</param>
 	/// <param name="won">Whether the match was won</param>
-	void Save(std::string gameMode, int goals, int assists, int saves, int shots, int won);
+	void Save(std::string gameMode, int goals, int assists, int saves, int shots, int won, int crossbars);
 
 	/// <summary>
 	/// Loads saved match data
@@ -90,5 +95,6 @@ public:
 	void RegisterCvars();
 	void LoadHooks();
 	void OnMatchEnd(std::string name);
+	void OnCrossbarHit(std::string name);
 	void RenderSettings() override;
 };
